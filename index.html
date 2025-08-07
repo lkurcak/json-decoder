@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Decoder Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .column {
+            flex: 1;
+        }
+        textarea {
+            width: 100%;
+            height: 400px;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .format-options {
+            margin-bottom: 10px;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .success {
+            color: green;
+        }
+        #status {
+            margin-top: 10px;
+            font-style: italic;
+        }
+        .copy-btn {
+            background-color: #2196F3;
+        }
+        .copy-btn:hover {
+            background-color: #0b7dda;
+        }
+        .clear-btn {
+            background-color: #f44336;
+        }
+        .clear-btn:hover {
+            background-color: #d32f2f;
+        }
+        
+        /* Responsive design improvements */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            .controls {
+                flex-wrap: wrap;
+            }
+            button {
+                margin: 5px;
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+        }
+        
+        .file-input-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* Better visual feedback */
+        .drag-over {
+            border: 2px dashed #4CAF50 !important;
+            background-color: #f0f8f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>JSON Decoder Tool</h1>
+    
+    <div class="format-options">
+        <label>
+            <input type="checkbox" id="prettyPrint" checked> 
+            Pretty print output
+        </label>
+        <label>
+            <input type="number" id="indentSize" value="2" min="1" max="8" style="width: 40px"> 
+            Indent size
+        </label>
+    </div>
+    
+    <div class="controls">
+        <button id="decodeBtn">Decode JSON</button>
+        <button id="decodeAllBtn">Decode All Nested JSON</button>
+        <button id="copyBtn" class="copy-btn">Copy Output</button>
+        <button id="clearBtn" class="clear-btn">Clear All</button>
+        <button id="loadExampleBtn">Load Example</button>
+    </div>
+    
+    <div class="file-input-container" style="margin-bottom: 10px;">
+        <label for="fileInput">Upload JSON file:</label>
+        <input type="file" id="fileInput" accept=".json,.txt" style="margin-left: 10px;">
+    </div>
+    
+    <div class="container">
+        <div class="column">
+            <h3>Input JSON:</h3>
+            <textarea id="inputJson" placeholder="Paste your JSON-encoded JSON here..."></textarea>
+        </div>
+        <div class="column">
+            <h3>Decoded Output:</h3>
+            <textarea id="outputJson" readonly></textarea>
+        </div>
+    </div>
+    
+    <div id="status"></div>
+    
+    <details style="margin-top: 20px; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+        <summary style="cursor: pointer; font-weight: bold;">Instructions & Keyboard Shortcuts</summary>
+        <div style="margin-top: 10px;">
+            <h4>How to use:</h4>
+            <ul>
+                <li><strong>Decode JSON:</strong> Parse JSON once (single level)</li>
+                <li><strong>Decode All Nested JSON:</strong> Recursively decode all nested JSON strings</li>
+                <li><strong>File Support:</strong> Drag & drop or upload JSON/text files (max 10MB)</li>
+                <li><strong>Validation:</strong> Real-time JSON validation as you type</li>
+            </ul>
+            <h4>Keyboard Shortcuts:</h4>
+            <ul>
+                <li><strong>Ctrl/Cmd + Enter:</strong> Decode all nested JSON</li>
+                <li><strong>Ctrl/Cmd + L:</strong> Clear all fields</li>
+            </ul>
+            <h4>Features:</h4>
+            <ul>
+                <li>Handles deeply nested JSON (up to 50 levels)</li>
+                <li>Prevents infinite loops and circular references</li>
+                <li>Auto-resizing output area</li>
+                <li>Mobile-responsive design</li>
+            </ul>
+        </div>
+    </details>
+    
+    <script>
+        document.getElementById('decodeBtn').addEventListener('click', function() {
+            try {
+                const input = document.getElementById('inputJson').value;
+                if (!input.trim()) {
+                    setStatus('Please enter some JSON to decode', 'error');
+                    return;
+                }
+                
+                // Show loading state for large inputs
+                if (input.length > 10000) {
+                    setStatus('Processing large JSON...', 'success');
+                    setTimeout(() => {
+                        try {
+                            const decoded = JSON.parse(input);
+                            displayOutput(decoded);
+                            setStatus('JSON decoded successfully!', 'success');
+                        } catch (error) {
+                            setStatus('Error decoding JSON: ' + error.message, 'error');
+                        }
+                    }, 10);
+                } else {
+                    const decoded = JSON.parse(input);
+                    displayOutput(decoded);
+                    setStatus('JSON decoded successfully!', 'success');
+                }
+            } catch (error) {
+                setStatus('Error decoding JSON: ' + error.message, 'error');
+            }
+        });
+        
+        document.getElementById('decodeAllBtn').addEventListener('click', function() {
+            try {
+                const input = document.getElementById('inputJson').value;
+                if (!input.trim()) {
+                    setStatus('Please enter some JSON to decode', 'error');
+                    return;
+                }
+                
+                // Show loading state for complex operations
+                setStatus('Decoding nested JSON...', 'success');
+                
+                // Use setTimeout to prevent UI blocking
+                setTimeout(() => {
+                    try {
+                        const fullyDecoded = fullyDecodeJson(input);
+                        displayOutput(fullyDecoded);
+                        setStatus('All nested JSON decoded successfully!', 'success');
+                    } catch (error) {
+                        if (error.message.includes('Maximum decoding depth')) {
+                            setStatus('Error: JSON nesting too deep (max 50 levels)', 'error');
+                        } else {
+                            setStatus('Error decoding JSON: ' + error.message, 'error');
+                        }
+                    }
+                }, 10);
+            } catch (error) {
+                setStatus('Error decoding JSON: ' + error.message, 'error');
+            }
+        });
+        
+        document.getElementById('copyBtn').addEventListener('click', async function() {
+            const outputText = document.getElementById('outputJson');
+            try {
+                // Use modern Clipboard API if available
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(outputText.value);
+                    setStatus('Output copied to clipboard!', 'success');
+                } else {
+                    // Fallback for older browsers
+                    outputText.select();
+                    document.execCommand('copy');
+                    setStatus('Output copied to clipboard!', 'success');
+                }
+            } catch (error) {
+                setStatus('Failed to copy to clipboard', 'error');
+            }
+        });
+        
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            document.getElementById('inputJson').value = '';
+            document.getElementById('outputJson').value = '';
+            setStatus('All fields cleared', 'success');
+        });
+        
+        function fullyDecodeJson(jsonStr, depth = 0, visited = new Set()) {
+            // Prevent infinite recursion and circular references
+            const MAX_DEPTH = 50;
+            if (depth > MAX_DEPTH) {
+                throw new Error('Maximum decoding depth exceeded');
+            }
+            
+            // Create a unique identifier for this string to detect circular references
+            const stringId = typeof jsonStr === 'string' ? jsonStr.substring(0, 100) : JSON.stringify(jsonStr).substring(0, 100);
+            if (visited.has(stringId)) {
+                return jsonStr; // Return original to avoid infinite loop
+            }
+            
+            try {
+                // Try to decode the string as JSON
+                const decoded = JSON.parse(jsonStr);
+                
+                // Add to visited set for circular reference detection
+                if (typeof jsonStr === 'string') {
+                    visited.add(stringId);
+                }
+                
+                // If the result is a string, it might be another JSON string
+                if (typeof decoded === 'string') {
+                    try {
+                        const result = fullyDecodeJson(decoded, depth + 1, new Set(visited));
+                        visited.delete(stringId);
+                        return result;
+                    } catch (e) {
+                        // If it's not valid JSON, return the string
+                        visited.delete(stringId);
+                        return decoded;
+                    }
+                }
+                
+                // If the result is an object or array, recursively decode any string values
+                if (typeof decoded === 'object' && decoded !== null) {
+                    if (Array.isArray(decoded)) {
+                        const result = decoded.map(item => {
+                            if (typeof item === 'string') {
+                                try {
+                                    return fullyDecodeJson(item, depth + 1, new Set(visited));
+                                } catch (e) {
+                                    return item;
+                                }
+                            } else if (typeof item === 'object' && item !== null) {
+                                return fullyDecodeJson(JSON.stringify(item), depth + 1, new Set(visited));
+                            }
+                            return item;
+                        });
+                        visited.delete(stringId);
+                        return result;
+                    } else {
+                        const result = {};
+                        Object.keys(decoded).forEach(key => {
+                            if (typeof decoded[key] === 'string') {
+                                try {
+                                    result[key] = fullyDecodeJson(decoded[key], depth + 1, new Set(visited));
+                                } catch (e) {
+                                    // Keep the original string if it's not valid JSON
+                                    result[key] = decoded[key];
+                                }
+                            } else if (typeof decoded[key] === 'object' && decoded[key] !== null) {
+                                try {
+                                    result[key] = fullyDecodeJson(JSON.stringify(decoded[key]), depth + 1, new Set(visited));
+                                } catch (e) {
+                                    result[key] = decoded[key];
+                                }
+                            } else {
+                                result[key] = decoded[key];
+                            }
+                        });
+                        visited.delete(stringId);
+                        return result;
+                    }
+                }
+                
+                visited.delete(stringId);
+                return decoded;
+            } catch (e) {
+                // If it's not valid JSON, return the original string
+                visited.delete(stringId);
+                return jsonStr;
+            }
+        }
+        
+        function displayOutput(data) {
+            const prettyPrint = document.getElementById('prettyPrint').checked;
+            const indentSize = parseInt(document.getElementById('indentSize').value) || 2;
+            
+            const outputElement = document.getElementById('outputJson');
+            
+            try {
+                if (prettyPrint) {
+                    outputElement.value = JSON.stringify(data, null, indentSize);
+                } else {
+                    outputElement.value = JSON.stringify(data);
+                }
+                
+                // Auto-resize the textarea to fit content
+                outputElement.style.height = 'auto';
+                outputElement.style.height = Math.min(Math.max(outputElement.scrollHeight, 400), 800) + 'px';
+            } catch (error) {
+                outputElement.value = 'Error displaying output: ' + error.message;
+                setStatus('Error displaying output: ' + error.message, 'error');
+            }
+        }
+        
+        function setStatus(message, type) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = type;
+            
+            // Clear status after 3 seconds
+            setTimeout(() => {
+                statusElement.textContent = '';
+                statusElement.className = '';
+            }, 3000);
+        }
+        
+        // Example data for testing - improved examples
+        const exampleData = {
+            "simple_string": "Hello World",
+            "single_encoded": "{\"name\": \"John\", \"age\": 30}",
+            "double_encoded": "\"{\\\"name\\\": \\\"Jane\\\", \\\"city\\\": \\\"New York\\\"}\"",
+            "triple_encoded": "\"\\\"{\\\\\\\"deeply\\\\\\\": \\\\\\\"nested\\\\\\\", \\\\\\\"data\\\\\\\": 123}\\\"\"",
+            "array_with_encoded": [
+                "normal string",
+                "{\"encoded\": \"object\"}",
+                "\"{\\\"double\\\": \\\"encoded\\\"}\""
+            ],
+            "mixed_object": {
+                "normal": "value",
+                "encoded": "{\"inner\": \"value\"}",
+                "number": 42,
+                "boolean": true
+            }
+        };
+        
+
+// Load example data when clicking the "Load Example" button
+        document.getElementById('loadExampleBtn').addEventListener('click', function() {
+            document.getElementById('inputJson').value = JSON.stringify(exampleData);
+            setStatus('Example data loaded', 'success');
+        });
+        
+        // Handle file uploads with validation
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // Validate file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                setStatus('File too large. Maximum size is 10MB', 'error');
+                this.value = '';
+                return;
+            }
+            
+            // Validate file type
+            if (!file.type.includes('json') && !file.type.includes('text') && !file.name.endsWith('.json') && !file.name.endsWith('.txt')) {
+                setStatus('Please select a JSON or text file', 'error');
+                this.value = '';
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('inputJson').value = e.target.result;
+                setStatus('File loaded successfully', 'success');
+            };
+            reader.onerror = function() {
+                setStatus('Error reading file', 'error');
+            };
+            reader.readAsText(file);
+        });
+        
+        // Handle drag and drop with better visual feedback
+        const dropZone = document.getElementById('inputJson');
+        
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+        
+        dropZone.addEventListener('dragleave', function(e) {
+            // Only remove the class if we're actually leaving the element
+            if (!dropZone.contains(e.relatedTarget)) {
+                dropZone.classList.remove('drag-over');
+            }
+        });
+        
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+            
+            // Check file type
+            if (!file.type.includes('json') && !file.type.includes('text') && !file.name.endsWith('.json') && !file.name.endsWith('.txt')) {
+                setStatus('Please drop a JSON or text file', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                dropZone.value = e.target.result;
+                setStatus('File dropped and loaded successfully', 'success');
+            };
+            reader.onerror = function() {
+                setStatus('Error reading dropped file', 'error');
+            };
+            reader.readAsText(file);
+        });
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'Enter':
+                        e.preventDefault();
+                        document.getElementById('decodeAllBtn').click();
+                        break;
+                    case 'c':
+                        if (e.target === document.getElementById('outputJson')) {
+                            // Let the default copy behavior work for the output textarea
+                            return;
+                        }
+                        break;
+                    case 'l':
+                        e.preventDefault();
+                        document.getElementById('clearBtn').click();
+                        break;
+                }
+            }
+        });
+        
+        // Add input validation and real-time feedback
+        document.getElementById('inputJson').addEventListener('input', function() {
+            const input = this.value.trim();
+            if (!input) {
+                setStatus('', '');
+                return;
+            }
+            
+            try {
+                JSON.parse(input);
+                setStatus('Valid JSON detected', 'success');
+            } catch (e) {
+                setStatus('Invalid JSON format', 'error');
+            }
+        });
+    </script>
+</body>
+</html>
