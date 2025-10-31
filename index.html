@@ -117,12 +117,16 @@
     
     <div class="format-options">
         <label>
-            <input type="checkbox" id="prettyPrint" checked> 
+            <input type="checkbox" id="prettyPrint" checked>
             Pretty print output
         </label>
         <label>
-            <input type="number" id="indentSize" value="2" min="1" max="8" style="width: 40px"> 
+            <input type="number" id="indentSize" value="2" min="1" max="8" style="width: 40px">
             Indent size
+        </label>
+        <label>
+            <input type="checkbox" id="removeEscapedWhitespace">
+            Remove escaped whitespace
         </label>
     </div>
     
@@ -196,7 +200,7 @@
                     setStatus('Processing large JSON...', 'success');
                     setTimeout(() => {
                         try {
-                            const decoded = tryParseWithUnescape(input);
+                            const decoded = JSON.parse(input);
                             displayOutput(decoded);
                             setStatus('JSON decoded successfully!', 'success');
                         } catch (error) {
@@ -204,7 +208,7 @@
                         }
                     }, 10);
                 } else {
-                    const decoded = tryParseWithUnescape(input);
+                    const decoded = JSON.parse(input);
                     displayOutput(decoded);
                     setStatus('JSON decoded successfully!', 'success');
                 }
@@ -220,12 +224,13 @@
                     setStatus('Please enter some JSON to decode', 'error');
                     return;
                 }
+                
                 // Show loading state for complex operations
                 setStatus('Decoding nested JSON...', 'success');
                 // Use setTimeout to prevent UI blocking
                 setTimeout(() => {
                     try {
-                        const fullyDecoded = fullyDecodeJson(tryParseWithUnescape(input));
+                        const fullyDecoded = fullyDecodeJson(input);
                         displayOutput(fullyDecoded);
                         setStatus('All nested JSON decoded successfully!', 'success');
                     } catch (error) {
@@ -239,33 +244,6 @@
             } catch (error) {
                 setStatus('Error decoding JSON: ' + error.message, 'error');
             }
-        // Try to parse JSON, and if it fails, try unescaping and parsing again
-        function tryParseWithUnescape(input) {
-            try {
-                return JSON.parse(input);
-            } catch (e) {
-                // Try to unescape and parse again
-                try {
-                    // Remove leading/trailing quotes if present
-                    let unescaped = input;
-                    if ((unescaped.startsWith('"') && unescaped.endsWith('"')) || (unescaped.startsWith("'") && unescaped.endsWith("'"))) {
-                        unescaped = unescaped.slice(1, -1);
-                    }
-                    // Replace escaped newlines, tabs, etc.
-                    unescaped = unescaped.replace(/\\n/g, '\n')
-                        .replace(/\\r/g, '\r')
-                        .replace(/\\t/g, '\t')
-                        .replace(/\\f/g, '\f')
-                        .replace(/\\b/g, '\b')
-                        .replace(/\\"/g, '"')
-                        .replace(/\\'/g, "'")
-                        .replace(/\\\\/g, '\\');
-                    return JSON.parse(unescaped);
-                } catch (e2) {
-                    throw new Error('Could not parse JSON, even after unescaping.');
-                }
-            }
-        }
         });
         
         document.getElementById('copyBtn').addEventListener('click', async function() {
@@ -381,16 +359,22 @@
         function displayOutput(data) {
             const prettyPrint = document.getElementById('prettyPrint').checked;
             const indentSize = parseInt(document.getElementById('indentSize').value) || 2;
-            
+            const removeEscapedWhitespace = document.getElementById('removeEscapedWhitespace').checked;
+
             const outputElement = document.getElementById('outputJson');
-            
+
             try {
-                if (prettyPrint) {
-                    outputElement.value = JSON.stringify(data, null, indentSize);
-                } else {
-                    outputElement.value = JSON.stringify(data);
+                let jsonString = JSON.stringify(data);
+                if (removeEscapedWhitespace) {
+                    // Remove all escaped whitespace: \n, \t, \r, \f, \v
+                    jsonString = jsonString.replace(/\\[ntrfv]/g, '');
                 }
-                
+                // Now prettify if needed
+                if (prettyPrint) {
+                    // Parse and re-stringify with indentation
+                    jsonString = JSON.stringify(JSON.parse(jsonString), null, indentSize);
+                }
+                outputElement.value = jsonString;
                 // Auto-resize the textarea to fit content
                 outputElement.style.height = 'auto';
                 outputElement.style.height = Math.min(Math.max(outputElement.scrollHeight, 400), 800) + 'px';
@@ -404,12 +388,7 @@
             const statusElement = document.getElementById('status');
             statusElement.textContent = message;
             statusElement.className = type;
-            
-            // Clear status after 3 seconds
-            setTimeout(() => {
-                statusElement.textContent = '';
-                statusElement.className = '';
-            }, 3000);
+            // Do not clear status automatically; it will persist until updated by another call
         }
         
         // Example data for testing - improved examples
