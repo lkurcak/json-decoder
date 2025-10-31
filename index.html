@@ -178,13 +178,12 @@
                     setStatus('Please enter some JSON to decode', 'error');
                     return;
                 }
-                
                 // Show loading state for large inputs
                 if (input.length > 10000) {
                     setStatus('Processing large JSON...', 'success');
                     setTimeout(() => {
                         try {
-                            const decoded = JSON.parse(input);
+                            const decoded = tryParseWithUnescape(input);
                             displayOutput(decoded);
                             setStatus('JSON decoded successfully!', 'success');
                         } catch (error) {
@@ -192,7 +191,7 @@
                         }
                     }, 10);
                 } else {
-                    const decoded = JSON.parse(input);
+                    const decoded = tryParseWithUnescape(input);
                     displayOutput(decoded);
                     setStatus('JSON decoded successfully!', 'success');
                 }
@@ -208,14 +207,12 @@
                     setStatus('Please enter some JSON to decode', 'error');
                     return;
                 }
-                
                 // Show loading state for complex operations
                 setStatus('Decoding nested JSON...', 'success');
-                
                 // Use setTimeout to prevent UI blocking
                 setTimeout(() => {
                     try {
-                        const fullyDecoded = fullyDecodeJson(input);
+                        const fullyDecoded = fullyDecodeJson(tryParseWithUnescape(input));
                         displayOutput(fullyDecoded);
                         setStatus('All nested JSON decoded successfully!', 'success');
                     } catch (error) {
@@ -229,6 +226,33 @@
             } catch (error) {
                 setStatus('Error decoding JSON: ' + error.message, 'error');
             }
+        // Try to parse JSON, and if it fails, try unescaping and parsing again
+        function tryParseWithUnescape(input) {
+            try {
+                return JSON.parse(input);
+            } catch (e) {
+                // Try to unescape and parse again
+                try {
+                    // Remove leading/trailing quotes if present
+                    let unescaped = input;
+                    if ((unescaped.startsWith('"') && unescaped.endsWith('"')) || (unescaped.startsWith("'") && unescaped.endsWith("'"))) {
+                        unescaped = unescaped.slice(1, -1);
+                    }
+                    // Replace escaped newlines, tabs, etc.
+                    unescaped = unescaped.replace(/\\n/g, '\n')
+                        .replace(/\\r/g, '\r')
+                        .replace(/\\t/g, '\t')
+                        .replace(/\\f/g, '\f')
+                        .replace(/\\b/g, '\b')
+                        .replace(/\\"/g, '"')
+                        .replace(/\\'/g, "'")
+                        .replace(/\\\\/g, '\\');
+                    return JSON.parse(unescaped);
+                } catch (e2) {
+                    throw new Error('Could not parse JSON, even after unescaping.');
+                }
+            }
+        }
         });
         
         document.getElementById('copyBtn').addEventListener('click', async function() {
